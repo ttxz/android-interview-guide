@@ -36,7 +36,7 @@
 
 ### 1. FlutterEngine 是什么？
 
-**一句话**：FlutterEngine 就是 Flutter 的"发动机"，负责运行 Dart 代码和渲染 UI。
+**一句话**：`FlutterEngine` 就是 `Flutter` 的"发动机"，负责运行 Dart 代码和渲染 UI。
 
 **类比理解**：
 

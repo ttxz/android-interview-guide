@@ -78,6 +78,14 @@ override fun onDraw(canvas: Canvas) {
 }
 ```
 
+> **🔥高频面试题：为什么在 onDraw() 中不能创建对象（如 Paint、Path 等）？**
+>
+> 1. **调用频率极高**：`onDraw()` 会在 View 每次重绘（如滚动、动画、内容改变）时被频繁调用（例如 60fps 时每隔 16ms 调用一次）。
+> 2. **内存抖动 (Memory Churn)**：如果在其中创建对象，会导致短时间内产生大量局部对象，这些对象很快失效变成垃圾。
+> 3. **触发频繁 GC**：内存迅速耗尽会频繁触发垃圾回收（GC），而 GC 执行时会暂停所有其他线程的工作（Stop The World），进而导致应用卡顿、掉帧。
+>
+> **正确做法**：将画笔（Paint）、路径（Path）等对象的创建放在构造函数或 `init` 块中，并在初始化时预先进行配置。
+
 ### 4. requestLayout vs invalidate vs postInvalidate
 
 | 方法 | 触发流程 | 线程 | 使用场景 |
@@ -181,7 +189,71 @@ class ChildView : View {
 
 ---
 
-## 三、常见自定义 View 实现
+## 三、自定义 View 标准开发流程
+
+> **面试核心考点**：描述从零开始写一个自定义 View 的规范套路。
+
+### 1. 继承基类
+
+- **继承 View 或 ViewGroup**：适用于从头开始实现完整的测量、布局和绘制。
+- **继承现有控件**（如 `TextView`、`LinearLayout`）：只需扩展或修改原有交互或外观。
+
+### 2. 自定义属性（attrs.xml）
+
+在 `res/values/attrs.xml` 中定义 `<declare-styleable>`：
+
+```xml
+<declare-styleable name="MyCustomView">
+    <attr name="customColor" format="color" />
+    <attr name="customSize" format="dimension" />
+</declare-styleable>
+```
+
+在构造函数中通过 `TypedArray` 获取属性，最后务必调用 `typedArray.recycle()`。
+
+### 3. 重写构造方法
+
+通常要处理不同场景下的构造调用，Kotlin 中常使用 `@JvmOverloads` 注解简化：
+
+```kotlin
+class MyCustomView @JvmOverloads constructor(
+    context: Context, 
+    attrs: AttributeSet? = null, 
+    defStyleAttr: Int = 0
+) : View(context, attrs, defStyleAttr) {
+    
+    init {
+        // 1. 获取自定义属性
+        val a = context.obtainStyledAttributes(attrs, R.styleable.MyCustomView)
+        val color = a.getColor(R.styleable.MyCustomView_customColor, Color.BLACK)
+        a.recycle() // 必须回收
+        
+        // 2. 初始化 Paint 等对象，千万别放在 onDraw 里
+    }
+}
+```
+
+### 4. 测量与布局阶段（onMeasure / onLayout）
+
+- **继承 View**：必须重写 `onMeasure()`，重点是对 `MeasureSpec.AT_MOST`（即 `wrap_content`）的情况提供默认的具体尺寸，否则它的表现会和 `match_parent` 一模一样。
+- **继承 ViewGroup**：必须重写 `onLayout()` 来计算所有子 View 的位置；通常也要重写 `onMeasure()` 分别执行 `measureChildren` 并累加算出自身的尺寸。
+
+### 5. 尺寸确定节点（onSizeChanged）
+
+- 如果需要根据 View 具体长宽来初始化尺寸相关的数据（例如：渐变色 Shader 的边界、RectF 等），推荐放在 `onSizeChanged(w, h, oldw, oldh)` 中处理，此时宽高已经计算完毕。
+
+### 6. 绘制阶段（onDraw）
+
+- 使用初始化好的 `Paint`、`Path` 以及尺寸数据，调用 `Canvas` 的 API（如 `drawCircle`、`drawText` 等）绘制内容。
+
+### 7. 交互与外露接口（onTouchEvent / invalidate）
+
+- 若有手势交互需求，重写 `onTouchEvent()`。
+- 当状态改变时，提供对外的 setter 方法，在 setter 内修改属性并视情况调用 `invalidate()` (只更新UI) 或 `requestLayout()` (尺寸受影响需重新布局)。
+
+---
+
+## 四、常见自定义 View 实现
 
 ### 1. 圆形头像
 
